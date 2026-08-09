@@ -1,37 +1,45 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 
-router = APIRouter()
+from app.models.transaction import OrderCreate
+from app.services.finance_service import finance_service
+
+router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 
-@router.get("/transactions")
+@router.get("")
 def get_transactions():
     return {
-        "status": "success",
-        "transactions": []
+        "success": True,
+        "transactions": finance_service.get_transactions(),
     }
 
 
-@router.post("/transactions")
-def add_transaction(transaction: dict):
+@router.post("", status_code=status.HTTP_201_CREATED)
+def add_transaction(order: OrderCreate):
+    result = finance_service.create_order(
+        customer_name=order.customerName,
+        items=[item.model_dump() for item in order.items],
+        status=order.status,
+    )
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["message"])
     return {
-        "status": "success",
-        "message": "Transaction added successfully",
-        "transaction": transaction
+        "success": True,
+        "message": "Sale recorded successfully",
+        "transaction": result["transaction"],
     }
 
 
-@router.get("/transactions/{transaction_id}")
+@router.get("/{transaction_id}")
 def get_transaction(transaction_id: str):
-    return {
-        "status": "success",
-        "transaction_id": transaction_id
-    }
+    transaction = finance_service.get_transaction(transaction_id)
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    return {"success": True, "transaction": transaction}
 
 
-@router.delete("/transactions/{transaction_id}")
+@router.delete("/{transaction_id}")
 def delete_transaction(transaction_id: str):
-    return {
-        "status": "success",
-        "message": "Transaction deleted successfully",
-        "transaction_id": transaction_id
-    }
+    if not finance_service.delete_transaction(transaction_id):
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    return {"success": True, "message": "Transaction deleted successfully"}

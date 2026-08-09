@@ -18,6 +18,7 @@ export default function ProductModal({
 }) {
   const [form, setForm] = useState(emptyProduct);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setForm(product || emptyProduct);
@@ -30,7 +31,7 @@ export default function ProductModal({
     });
   };
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault();
 
     if (!form.name.trim() || !form.supplier.trim()) {
@@ -56,8 +57,16 @@ export default function ProductModal({
       return;
     }
 
-    onSave(form);
-    onClose();
+    try {
+      setSaving(true);
+      setError("");
+      await onSave(form);
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -169,12 +178,17 @@ export default function ProductModal({
               type="button"
               className="button secondary"
               onClick={onClose}
+              disabled={saving}
             >
               Cancel
             </button>
 
-            <button className="button primary">
-              {product ? "Save Changes" : "Add Product"}
+            <button className="button primary" disabled={saving}>
+              {saving
+                ? "Saving..."
+                : product
+                  ? "Save Changes"
+                  : "Add Product"}
             </button>
           </div>
         </form>

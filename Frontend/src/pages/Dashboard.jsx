@@ -11,6 +11,10 @@ export default function Dashboard({ goTo }) {
     orders,
     summary,
     runVoiceDemo,
+    executeCommand,
+    refreshData,
+    loading,
+    connectionError,
   } = useBusiness();
 
   const cards = [
@@ -60,6 +64,14 @@ export default function Dashboard({ goTo }) {
 
   return (
     <div className="page-stack">
+      {connectionError && (
+        <div className="backend-alert">
+          <strong>Backend offline:</strong> {connectionError}
+        </div>
+      )}
+
+      {loading && <p className="muted-copy">Business data load ho raha hai…</p>}
+
       <div className="welcome-row">
         <div>
           <span className="eyebrow">
@@ -87,6 +99,8 @@ export default function Dashboard({ goTo }) {
       <div className="dashboard-grid">
         <VoiceRecorder
           onDemoCommand={runVoiceDemo}
+          onTextCommand={executeCommand}
+          onCommandComplete={refreshData}
         />
 
         <LowStockAlert products={products} />

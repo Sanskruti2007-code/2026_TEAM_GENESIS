@@ -4,6 +4,13 @@ import re
 
 
 PRODUCT_ALIASES = {
+    # Branded demo product
+    "डेटॉल साबण": "Dettol Soap",
+    "डेटॉल साबुन": "Dettol Soap",
+    "डिटॉल साबण": "Dettol Soap",
+    "डिटॉल साबुन": "Dettol Soap",
+    "dettol soap": "Dettol Soap",
+
     # Rice
     "तांदूळ": "Rice",
     "तांदुळ": "Rice",

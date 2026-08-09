@@ -1,17 +1,18 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import health, voice, products, transactions, reports
+from app.config import settings
+from app.routes import health, products, reports, transactions, voice
 
 app = FastAPI(
-    title="VaaniOS - MSME Voice OS",
+    title="VyaparSaathi - MSME Voice OS",
     description="Vernacular Agentic Voice OS for MSME Operators",
     version="1.0.0",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,6 +28,6 @@ app.include_router(reports.router, prefix="/api")
 @app.get("/")
 def root():
     return {
-        "message": "VaaniOS Backend is running",
+        "message": "VyaparSaathi Backend is running",
         "status": "online"
     }

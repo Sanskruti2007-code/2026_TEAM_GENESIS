@@ -1,48 +1,41 @@
 from fastapi import APIRouter
 
-router = APIRouter()
+from app.services.finance_service import finance_service
+from app.services.inventory_service import inventory_service
+from app.services.report_service import report_service
+
+router = APIRouter(prefix="/reports", tags=["reports"])
 
 
-@router.get("/reports")
+@router.get("")
 def get_reports():
-    return {
-        "status": "success",
-        "reports": []
-    }
+    return {"success": True, "report": report_service.generate_dashboard_report()}
 
 
-@router.get("/reports/sales")
+@router.get("/today")
+def today_report():
+    return {"success": True, "report": finance_service.get_summary(today_only=True)}
+
+
+@router.get("/low-stock")
+def low_stock_report():
+    products = inventory_service.get_low_stock_products()
+    return {"success": True, "count": len(products), "products": products}
+
+
+@router.get("/sales")
 def sales_report():
-    return {
-        "status": "success",
-        "report_type": "sales",
-        "data": {
-            "total_sales": 0,
-            "total_orders": 0
-        }
-    }
+    return {"success": True, "data": finance_service.get_summary()}
 
 
-@router.get("/reports/inventory")
+@router.get("/inventory")
 def inventory_report():
     return {
-        "status": "success",
-        "report_type": "inventory",
-        "data": {
-            "total_products": 0,
-            "low_stock_products": 0
-        }
+        "success": True,
+        "data": report_service.generate_dashboard_report()["inventory"],
     }
 
 
-@router.get("/reports/finance")
+@router.get("/finance")
 def finance_report():
-    return {
-        "status": "success",
-        "report_type": "finance",
-        "data": {
-            "total_income": 0,
-            "total_expense": 0,
-            "profit": 0
-        }
-    }
+    return {"success": True, "data": finance_service.get_summary()}
