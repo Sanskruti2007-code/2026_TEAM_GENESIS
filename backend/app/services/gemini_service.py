@@ -1,36 +1,50 @@
 import json
 import re
-from typing import Optional
 
 from app.config import settings
+from app.services.api_key_store import api_key_store
 
 try:
     from google import genai
     from google.genai import types
-except ImportError:  # The rule parser still works without google-genai.
+except ImportError:
     genai = None
     types = None
 
 
 class GeminiService:
-    def __init__(self):
-        self.client = (
-            genai.Client(api_key=settings.GEMINI_API_KEY)
-            if genai and settings.GEMINI_API_KEY
-            else None
-        )
+    def _get_api_key(self) -> str:
+        """
+        First use the key entered through the app.
+        If unavailable, fall back to backend/.env.
+        """
+        return api_key_store.get_key("gemini") or settings.GEMINI_API_KEY
+
+    def _get_client(self):
+        api_key = self._get_api_key()
+
+        if not genai or not api_key:
+            return None
+
+        return genai.Client(api_key=api_key)
 
     @property
     def enabled(self) -> bool:
-        return self.client is not None
+        return self._get_client() is not None
 
     @staticmethod
     def _json_from_text(text: str) -> dict:
-        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
+        cleaned = re.sub(
+            r"^```(?:json)?\s*|\s*```$",
+            "",
+            text.strip(),
+        )
         return json.loads(cleaned)
 
     def parse_command(self, text: str) -> dict:
-        if not self.client:
+        client = self._get_client()
+
+        if not client:
             return {}
 
         prompt = f"""
@@ -71,12 +85,15 @@ User command: {text}
                 if types
                 else None
             )
-            response = self.client.models.generate_content(
+
+            response = client.models.generate_content(
                 model=settings.GEMINI_MODEL,
                 contents=prompt,
                 config=config,
             )
+
             parsed = self._json_from_text(response.text or "{}")
+
             if parsed.get("action") not in {
                 "ADD_PRODUCT",
                 "SELL_PRODUCT",
@@ -86,31 +103,51 @@ User command: {text}
                 "UNKNOWN",
             }:
                 return {}
+
             return parsed
-        except Exception:
+
+        except Exception as error:
+            print(
+                f"[GEMINI PARSE ERROR] {type(error).__name__}: {error}",
+                flush=True,
+            )
             return {}
 
-    def transcribe_audio(self, audio_bytes: bytes, mime_type: str) -> str:
-        if not self.client or not types:
+    def transcribe_audio(
+        self,
+        audio_bytes: bytes,
+        mime_type: str,
+    ) -> str:
+        client = self._get_client()
+
+        if not client or not types:
             return ""
 
         prompt = (
-            "Transcribe this shopkeeper voice command exactly. The language may "
-            "be Marathi, Hindi, Hinglish, or English. Return only the transcript, "
-            "without quotation marks or explanation."
+            "Transcribe this shopkeeper voice command exactly. "
+            "The language may be Marathi, Hindi, Hinglish, or English. "
+            "Return only the transcript, without quotation marks or explanation."
         )
+
         try:
             audio_part = types.Part.from_bytes(
                 data=audio_bytes,
                 mime_type=mime_type or "audio/webm",
             )
-            response = self.client.models.generate_content(
+
+            response = client.models.generate_content(
                 model=settings.GEMINI_MODEL,
                 contents=[prompt, audio_part],
                 config=types.GenerateContentConfig(temperature=0),
             )
+
             return (response.text or "").strip()
-        except Exception:
+
+        except Exception as error:
+            print(
+                f"[GEMINI AUDIO ERROR] {type(error).__name__}: {error}",
+                flush=True,
+            )
             return ""
 
 

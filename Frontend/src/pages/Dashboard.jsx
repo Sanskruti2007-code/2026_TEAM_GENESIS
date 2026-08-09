@@ -1,3 +1,4 @@
+import AISettings from "../components/AISettings";
 import DashboardCards from "../components/DashboardCards";
 import LowStockAlert from "../components/LowStockAlert";
 import TransactionTable from "../components/TransactionTable";
@@ -128,6 +129,7 @@ export default function Dashboard({ goTo }) {
           orders={orders.slice(0, 5)}
         />
       </section>
+      <AISettings />
     </div>
   );
 }
