@@ -47,13 +47,17 @@ export default function Inventory() {
     setEditing(null);
   };
 
-  const removeProduct = (product) => {
+  const removeProduct = async (product) => {
     const confirmed = window.confirm(
       `Delete ${product.name}?`
     );
 
     if (confirmed) {
-      deleteProduct(product.id);
+      try {
+        await deleteProduct(product.id);
+      } catch (error) {
+        window.alert(error.message);
+      }
     }
   };
 

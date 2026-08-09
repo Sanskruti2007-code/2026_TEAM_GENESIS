@@ -1,80 +1,154 @@
-# backend/app/services/gemini_service.py
-
-import os
 import json
+import re
+
+from app.config import settings
+from app.services.api_key_store import api_key_store
 
 try:
     from google import genai
+    from google.genai import types
 except ImportError:
     genai = None
+    types = None
 
 
 class GeminiService:
+    def _get_api_key(self) -> str:
+        """
+        First use the key entered through the app.
+        If unavailable, fall back to backend/.env.
+        """
+        return api_key_store.get_key("gemini") or settings.GEMINI_API_KEY
 
-    def __init__(self):
+    def _get_client(self):
+        api_key = self._get_api_key()
 
-        self.api_key = os.getenv("GEMINI_API_KEY")
-        self.client = None
+        if not genai or not api_key:
+            return None
 
-        if genai and self.api_key:
-            self.client = genai.Client(
-                api_key=self.api_key
-            )
+        return genai.Client(api_key=api_key)
+
+    @property
+    def enabled(self) -> bool:
+        return self._get_client() is not None
+
+    @staticmethod
+    def _json_from_text(text: str) -> dict:
+        cleaned = re.sub(
+            r"^```(?:json)?\s*|\s*```$",
+            "",
+            text.strip(),
+        )
+        return json.loads(cleaned)
 
     def parse_command(self, text: str) -> dict:
+        client = self._get_client()
+
+        if not client:
+            return {}
 
         prompt = f"""
-You are an AI agent for an Indian MSME business.
+You are the command parser for VyaparSaathi, an Indian shop management app.
+The user may speak Marathi, Hindi, Hinglish, or English. Return ONLY JSON.
 
-Convert the user's command into JSON.
+Allowed actions:
+ADD_PRODUCT, SELL_PRODUCT, GET_INVENTORY, GET_LOW_STOCK, GET_REPORT, UNKNOWN
 
-Possible actions:
-
-ADD_PRODUCT
-UPDATE_STOCK
-SELL_PRODUCT
-GET_INVENTORY
-GET_LOW_STOCK
-GET_SALES
-GET_REPORT
-
-User command:
-{text}
-
-Return ONLY valid JSON.
-
-Example:
+Return this shape, omitting unknown optional values:
 {{
-    "action": "SELL_PRODUCT",
-    "product": "Rice",
-    "quantity": 5,
-    "price": 50
+  "action": "ADD_PRODUCT",
+  "product": "Dettol Soap",
+  "quantity": 20,
+  "purchase_price": 18,
+  "selling_price": 22,
+  "category": "Personal Care",
+  "supplier": "Local Supplier",
+  "reorder_level": 5
 }}
+
+Rules:
+- ADD_PRODUCT also covers adding/restocking inventory.
+- SELL_PRODUCT means a completed sale and must reduce stock.
+- Keep brand/product names readable; translate common nouns to English when useful.
+- Never invent quantity or prices.
+- For a daily sales/profit/summary question use GET_REPORT.
+
+User command: {text}
 """
 
-        if not self.client:
-            return {
-                "action": "UNKNOWN",
-                "message": "Gemini API configured nahi hai."
-            }
-
         try:
-
-            response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt
+            config = (
+                types.GenerateContentConfig(
+                    temperature=0,
+                    response_mime_type="application/json",
+                )
+                if types
+                else None
             )
 
-            result = response.text.strip()
+            response = client.models.generate_content(
+                model=settings.GEMINI_MODEL,
+                contents=prompt,
+                config=config,
+            )
 
-            return json.loads(result)
+            parsed = self._json_from_text(response.text or "{}")
 
-        except Exception as e:
+            if parsed.get("action") not in {
+                "ADD_PRODUCT",
+                "SELL_PRODUCT",
+                "GET_INVENTORY",
+                "GET_LOW_STOCK",
+                "GET_REPORT",
+                "UNKNOWN",
+            }:
+                return {}
 
-            return {
-                "action": "UNKNOWN",
-                "error": str(e)
-            }
+            return parsed
+
+        except Exception as error:
+            print(
+                f"[GEMINI PARSE ERROR] {type(error).__name__}: {error}",
+                flush=True,
+            )
+            return {}
+
+    def transcribe_audio(
+        self,
+        audio_bytes: bytes,
+        mime_type: str,
+    ) -> str:
+        client = self._get_client()
+
+        if not client or not types:
+            return ""
+
+        prompt = (
+            "Transcribe this shopkeeper voice command exactly. "
+            "The language may be Marathi, Hindi, Hinglish, or English. "
+            "Return only the transcript, without quotation marks or explanation."
+        )
+
+        try:
+            audio_part = types.Part.from_bytes(
+                data=audio_bytes,
+                mime_type=mime_type or "audio/webm",
+            )
+
+            response = client.models.generate_content(
+                model=settings.GEMINI_MODEL,
+                contents=[prompt, audio_part],
+                config=types.GenerateContentConfig(temperature=0),
+            )
+
+            return (response.text or "").strip()
+
+        except Exception as error:
+            print(
+                f"[GEMINI AUDIO ERROR] {type(error).__name__}: {error}",
+                flush=True,
+            )
+            return ""
 
 
 gemini_service = GeminiService()

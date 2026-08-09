@@ -1,14 +1,11 @@
-fastapi
-uvicorn[standard]
-python-multipart
-python-dotenv
+fastapi>=0.116,<1
+uvicorn[standard]>=0.35,<1
+python-multipart>=0.0.20,<1
+python-dotenv>=1.1,<2
 
-firebase-admin
+openai>=1.99,<3
+google-genai>=1.29,<3
 
-openai
-google-genai
-
-pydantic
-
-pytest
-httpx
+pydantic>=2.11,<3
+pytest>=8.4,<10
+httpx>=0.28,<1

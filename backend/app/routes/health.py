@@ -7,5 +7,5 @@ router = APIRouter()
 def health_check():
     return {
         "status": "healthy",
-        "service": "VaaniOS Backend"
+        "service": "VyaparSaathi Backend"
     }

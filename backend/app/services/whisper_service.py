@@ -1,6 +1,7 @@
-# backend/app/services/whisper_service.py
-
+import io
 import os
+
+from app.services.api_key_store import api_key_store
 
 try:
     from openai import OpenAI
@@ -9,37 +10,81 @@ except ImportError:
 
 
 class WhisperService:
+    def _get_api_key(self) -> str:
+        """
+        App mein entered session key ko priority milegi.
+        Agar session key nahi hai, toh .env key use hogi.
+        """
+        session_key = api_key_store.get_key("openai")
 
-    def __init__(self):
+        if session_key:
+            return session_key
 
-        self.api_key = os.getenv("OPENAI_API_KEY")
-        self.client = None
+        return os.getenv("OPENAI_API_KEY", "").strip()
 
-        if OpenAI and self.api_key:
-            self.client = OpenAI(
-                api_key=self.api_key
-            )
+    def _get_client(self):
+        api_key = self._get_api_key()
 
-    def transcribe(self, audio_file: str) -> str:
+        if OpenAI is None or not api_key:
+            return None
 
-        if not self.client:
-            return "Voice service configured nahi hai."
+        return OpenAI(api_key=api_key)
+
+    @property
+    def enabled(self) -> bool:
+        return self._get_client() is not None
+
+    @staticmethod
+    def _prepare_filename(filename: str) -> str:
+        safe_filename = os.path.basename(
+            filename or "voice-command.webm"
+        )
+
+        if "." not in safe_filename:
+            safe_filename += ".webm"
+
+        return safe_filename
+
+    def transcribe_bytes(
+        self,
+        audio_bytes: bytes,
+        filename: str = "voice-command.webm",
+    ) -> str:
+        """
+        Browser se received audio bytes ko OpenAI se transcribe karta hai.
+        Temporary audio file create nahi hoti.
+        """
+        client = self._get_client()
+
+        if not client or not audio_bytes:
+            return ""
+
+        model = os.getenv(
+            "OPENAI_TRANSCRIPTION_MODEL",
+            "gpt-transcribe",
+        )
+
+        audio_file = io.BytesIO(audio_bytes)
+        audio_file.name = self._prepare_filename(filename)
 
         try:
+            transcript = client.audio.transcriptions.create(
+                model=model,
+                file=audio_file,
+                prompt=(
+                    "This is a VyaparSaathi shop-management command. "
+                    "Speech may contain Marathi, Hindi, Hinglish, or English. "
+                    "Preserve product names, quantities, and prices accurately."
+                ),
+            )
 
-            with open(audio_file, "rb") as file:
+            return (transcript.text or "").strip()
 
-                transcript = self.client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=file
-                )
-
-            return transcript.text
-
-        except Exception as e:
-
-            print(f"Whisper error: {e}")
-
+        except Exception as error:
+            print(
+                "OpenAI transcription error:",
+                type(error).__name__,
+            )
             return ""
 
 

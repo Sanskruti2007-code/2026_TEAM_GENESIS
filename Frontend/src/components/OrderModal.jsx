@@ -20,6 +20,7 @@ export default function OrderModal({
 
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const addItem = () => {
     if (!selectedId) return;
@@ -92,11 +93,12 @@ export default function OrderModal({
     [items, products]
   );
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault();
 
     try {
-      onCreate({
+      setSaving(true);
+      await onCreate({
         customerName,
         items,
       });
@@ -104,6 +106,8 @@ export default function OrderModal({
       onClose();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -264,12 +268,13 @@ export default function OrderModal({
               type="button"
               className="button secondary"
               onClick={onClose}
+              disabled={saving}
             >
               Cancel
             </button>
 
-            <button className="button primary">
-              Create Order
+            <button className="button primary" disabled={saving}>
+              {saving ? "Creating..." : "Create Order"}
             </button>
           </div>
         </form>

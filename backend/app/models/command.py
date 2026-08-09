@@ -12,4 +12,6 @@ class CommandResponse(BaseModel):
     success: bool
     message: str
     action: Optional[str] = None
+    transcript: Optional[str] = None
+    source: Optional[str] = None
     data: Optional[dict] = None

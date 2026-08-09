@@ -1,3 +1,4 @@
+import AISettings from "../components/AISettings";
 import DashboardCards from "../components/DashboardCards";
 import LowStockAlert from "../components/LowStockAlert";
 import TransactionTable from "../components/TransactionTable";
@@ -11,6 +12,10 @@ export default function Dashboard({ goTo }) {
     orders,
     summary,
     runVoiceDemo,
+    executeCommand,
+    refreshData,
+    loading,
+    connectionError,
   } = useBusiness();
 
   const cards = [
@@ -60,6 +65,14 @@ export default function Dashboard({ goTo }) {
 
   return (
     <div className="page-stack">
+      {connectionError && (
+        <div className="backend-alert">
+          <strong>Backend offline:</strong> {connectionError}
+        </div>
+      )}
+
+      {loading && <p className="muted-copy">Business data load ho raha hai…</p>}
+
       <div className="welcome-row">
         <div>
           <span className="eyebrow">
@@ -87,6 +100,8 @@ export default function Dashboard({ goTo }) {
       <div className="dashboard-grid">
         <VoiceRecorder
           onDemoCommand={runVoiceDemo}
+          onTextCommand={executeCommand}
+          onCommandComplete={refreshData}
         />
 
         <LowStockAlert products={products} />
@@ -114,6 +129,7 @@ export default function Dashboard({ goTo }) {
           orders={orders.slice(0, 5)}
         />
       </section>
+      <AISettings />
     </div>
   );
 }

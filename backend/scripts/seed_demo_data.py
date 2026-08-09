@@ -1,146 +1,52 @@
-# backend/scripts/seed_demo_data.py
+"""Reset the local database and load predictable hackathon demo data."""
 
-import sys
 import os
-from datetime import datetime, timedelta
+import sys
 
-# Add backend directory to Python path
-sys.path.append(
-    os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..")
-    )
-)
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from app.services.finance_service import finance_service
 from app.services.firebase_service import firebase_service
+from app.services.inventory_service import inventory_service
 
 
-def seed_products():
-    products = [
-        {
-            "name": "Rice",
-            "quantity": 45,
-            "price": 60,
-            "category": "Grocery"
-        },
-        {
-            "name": "Wheat",
-            "quantity": 30,
-            "price": 45,
-            "category": "Grocery"
-        },
-        {
-            "name": "Sugar",
-            "quantity": 8,
-            "price": 50,
-            "category": "Grocery"
-        },
-        {
-            "name": "Tea",
-            "quantity": 15,
-            "price": 120,
-            "category": "Beverages"
-        },
-        {
-            "name": "Biscuits",
-            "quantity": 5,
-            "price": 30,
-            "category": "Snacks"
-        }
-    ]
-
-    print("\nAdding demo products...\n")
-
-    for product in products:
-
-        product["created_at"] = datetime.utcnow().isoformat()
-
-        product_id = firebase_service.add_document(
-            "products",
-            product
-        )
-
-        print(
-            f"Added: {product['name']} "
-            f"(ID: {product_id})"
-        )
-
-
-def seed_transactions():
-    transactions = [
-        {
-            "type": "sale",
-            "product": "Rice",
-            "quantity": 5,
-            "price": 60,
-            "total": 300,
-            "created_at": (
-                datetime.utcnow() - timedelta(hours=3)
-            ).isoformat()
-        },
-        {
-            "type": "sale",
-            "product": "Wheat",
-            "quantity": 3,
-            "price": 45,
-            "total": 135,
-            "created_at": (
-                datetime.utcnow() - timedelta(hours=2)
-            ).isoformat()
-        },
-        {
-            "type": "sale",
-            "product": "Tea",
-            "quantity": 2,
-            "price": 120,
-            "total": 240,
-            "created_at": (
-                datetime.utcnow() - timedelta(hours=1)
-            ).isoformat()
-        }
-    ]
-
-    print("\nAdding demo transactions...\n")
-
-    for transaction in transactions:
-
-        transaction_id = firebase_service.add_document(
-            "transactions",
-            transaction
-        )
-
-        print(
-            f"Added sale: "
-            f"{transaction['product']} × "
-            f"{transaction['quantity']} "
-            f"(ID: {transaction_id})"
-        )
+PRODUCTS = [
+    ("Parle-G Biscuits", 45, 8, 10, "Grocery", "ABC Distributors", 15),
+    ("Aashirvaad Atta 5kg", 58, 210, 245, "Grocery", "Shree Wholesale", 20),
+    ("Dettol Soap", 17, 18, 22, "Personal Care", "Nagpur FMCG Hub", 8),
+    ("Tata Salt 1kg", 11, 23, 28, "Grocery", "Shree Wholesale", 12),
+    ("Fortune Oil 1L", 7, 128, 145, "Cooking Essentials", "Vidarbha Oils", 10),
+    ("Maggi Noodles", 0, 12, 15, "Packaged Food", "ABC Distributors", 10),
+]
 
 
 def main():
+    firebase_service.clear_collection("transactions")
+    firebase_service.clear_collection("products")
 
-    print("=" * 50)
-    print("       VaaniOS Demo Data Seeder")
-    print("=" * 50)
-
-    if not firebase_service.enabled:
-
-        print(
-            "\nFirebase is not configured."
+    saved = {}
+    for name, quantity, buying, selling, category, supplier, reorder in PRODUCTS:
+        product = inventory_service.add_product(
+            name=name,
+            quantity=quantity,
+            purchase_price=buying,
+            selling_price=selling,
+            category=category,
+            supplier=supplier,
+            reorder_level=reorder,
         )
+        saved[name] = product
+        print(f"Added {name}: {quantity} units")
 
-        print(
-            "Please configure FIREBASE_CREDENTIALS "
-            "in your .env file."
-        )
-
-        return
-
-    seed_products()
-    seed_transactions()
-
-    print("\n" + "=" * 50)
-    print("Demo data successfully added!")
-    print("=" * 50)
+    finance_service.create_order(
+        "Walk-in Customer",
+        [{"productId": saved["Parle-G Biscuits"]["id"], "quantity": 3}],
+    )
+    finance_service.create_order(
+        "Rahul Traders",
+        [{"productId": saved["Dettol Soap"]["id"], "quantity": 2}],
+    )
+    print("Demo products and today's sales are ready.")
 
 
 if __name__ == "__main__":
